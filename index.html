@@ -1,0 +1,152 @@
+<html>
+
+<head>
+    <title>ncnn webassembly yolov5</title>
+</head>
+
+<body>
+    <h3>ncnn webassembly yolov5</h3>
+    <input type="file" id="input" accept="image/*">
+    <div>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script type='text/javascript'>
+        var Module = {};
+        fetch('yolov5.wasm')
+            .then(response => response.arrayBuffer())
+            .then(buffer => {
+                Module.wasmBinary = buffer;
+                var script = document.createElement('script');
+                script.src = 'yolov5.js';
+                script.onload = function() {
+                  console.log('Emscripten boilerplate loaded.');
+                }
+                document.body.appendChild(script);
+            });
+
+        var class_names = [
+            "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
+            "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
+            "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
+            "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard",
+            "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
+            "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
+            "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone",
+            "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear",
+            "hair drier", "toothbrush"
+        ];
+
+        var colors = [
+            "rgb( 54,  67, 244)",
+            "rgb( 99,  30, 233)",
+            "rgb(176,  39, 156)",
+            "rgb(183,  58, 103)",
+            "rgb(181,  81,  63)",
+            "rgb(243, 150,  33)",
+            "rgb(244, 169,   3)",
+            "rgb(212, 188,   0)",
+            "rgb(136, 150,   0)",
+            "rgb( 80, 175,  76)",
+            "rgb( 74, 195, 139)",
+            "rgb( 57, 220, 205)",
+            "rgb( 59, 235, 255)",
+            "rgb(  7, 193, 255)",
+            "rgb(  0, 152, 255)",
+            "rgb( 34,  87, 255)",
+            "rgb( 72,  85, 121)",
+            "rgb(158, 158, 158)",
+            "rgb(139, 125,  96)"
+        ];
+
+        var canvas = document.getElementById('canvas');
+        document.getElementById('input').onchange = function(e) {
+            var reader = new FileReader();
+            reader.onload = function(event) {
+                var img = new Image();
+                img.onload = function(){
+
+                    // scale down to 640x640
+                    var img_w = img.width;
+                    var img_h = img.height;
+
+                    if (img_w > img_h) {
+                        img_h = img_h * 640 / img_w;
+                        img_w = 640;
+                    }
+                    else {
+                        img_w = img_w * 640 / img_h;
+                        img_h = 640;
+                    }
+
+                    canvas.width = img_w;
+                    canvas.height = img_h;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, img_w, img_h);
+
+                    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    var data = imageData.data;
+
+                    dst = _malloc(data.length);
+                    HEAPU8.set(data, dst);
+
+                    // max 20 objects
+                    resultarray = new Float32Array(6 * 20);
+                    resultbuffer = _malloc(6 * 20 * Float32Array.BYTES_PER_ELEMENT);
+
+                    HEAPF32.set(resultarray, resultbuffer / Float32Array.BYTES_PER_ELEMENT);
+
+                    _yolov5_ncnn(dst, img_w, img_h, resultbuffer);
+
+                    // resultarray
+                    var qaqarray = HEAPF32.subarray(resultbuffer / Float32Array.BYTES_PER_ELEMENT, resultbuffer / Float32Array.BYTES_PER_ELEMENT + 6 * 20);
+
+                    var i;
+                    for (i = 0; i < 20; i++) {
+                        var label = qaqarray[i * 6 + 0];
+                        var prob = qaqarray[i * 6 + 1];
+                        var bbox_x = qaqarray[i * 6 + 2];
+                        var bbox_y = qaqarray[i * 6 + 3];
+                        var bbox_w = qaqarray[i * 6 + 4];
+                        var bbox_h = qaqarray[i * 6 + 5];
+
+                        if (label == -233)
+                            continue;
+
+                        console.log('qaq ' + label + ' = ' + prob);
+
+                        ctx.strokeStyle = colors[i % 19];
+                        ctx.strokeRect(bbox_x, bbox_y, bbox_w, bbox_h);
+
+                        var text = class_names[label] + " = " + parseFloat(prob * 100).toFixed(2) + "%";
+
+                        ctx.textBaseline = 'top';
+                        var text_width = ctx.measureText(text).width;
+                        var text_height = parseInt(ctx.font, 10);
+
+                        var x = bbox_x;
+                        var y = bbox_y - text_height;
+                        if (y < 0)
+                            y = 0;
+                        if (x + text_width > img_w)
+                            x = img_w - text_width;
+
+                        ctx.fillStyle = "rgb(255,255,255)";
+                        ctx.fillRect(x, y, text_width, text_height);
+                        ctx.fillStyle = "rgb(0,0,0)";
+                        ctx.fillText(text, x, y);
+                    }
+
+                    _free(resultbuffer);
+                    _free(dst);
+
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(e.target.files[0]);
+        };
+    </script>
+
+</body>
+
+</html>
