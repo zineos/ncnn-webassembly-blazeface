@@ -1,6 +1,7 @@
-<html>
+<html lang="en">
 
 <head>
+    <meta charset="utf-8">
     <title>ncnn webassembly yolov5</title>
 </head>
 
@@ -59,12 +60,75 @@
             "rgb(139, 125,  96)"
         ];
 
-        var canvas = document.getElementById('canvas');
+        function ncnn_yolov5() {
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            var data = imageData.data;
+
+            dst = _malloc(data.length);
+            HEAPU8.set(data, dst);
+
+            // max 20 objects
+            resultarray = new Float32Array(6 * 20);
+            resultbuffer = _malloc(6 * 20 * Float32Array.BYTES_PER_ELEMENT);
+
+            HEAPF32.set(resultarray, resultbuffer / Float32Array.BYTES_PER_ELEMENT);
+
+            _yolov5_ncnn(dst, canvas.width, canvas.height, resultbuffer);
+
+            // resultarray
+            var qaqarray = HEAPF32.subarray(resultbuffer / Float32Array.BYTES_PER_ELEMENT, resultbuffer / Float32Array.BYTES_PER_ELEMENT + 6 * 20);
+
+            var i;
+            for (i = 0; i < 20; i++) {
+                var label = qaqarray[i * 6 + 0];
+                var prob = qaqarray[i * 6 + 1];
+                var bbox_x = qaqarray[i * 6 + 2];
+                var bbox_y = qaqarray[i * 6 + 3];
+                var bbox_w = qaqarray[i * 6 + 4];
+                var bbox_h = qaqarray[i * 6 + 5];
+
+                if (label == -233)
+                    continue;
+
+                console.log('qaq ' + label + ' = ' + prob);
+
+                ctx.strokeStyle = colors[i % 19];
+                ctx.strokeRect(bbox_x, bbox_y, bbox_w, bbox_h);
+
+                var text = class_names[label] + " = " + parseFloat(prob * 100).toFixed(2) + "%";
+
+                ctx.textBaseline = 'top';
+                var text_width = ctx.measureText(text).width;
+                var text_height = parseInt(ctx.font, 10);
+
+                var x = bbox_x;
+                var y = bbox_y - text_height;
+                if (y < 0)
+                    y = 0;
+                if (x + text_width > canvas.width)
+                    x = canvas.width - text_width;
+
+                ctx.fillStyle = "rgb(255,255,255)";
+                ctx.fillRect(x, y, text_width, text_height);
+                ctx.fillStyle = "rgb(0,0,0)";
+                ctx.fillText(text, x, y);
+            }
+
+            _free(resultbuffer);
+            _free(dst);
+        }
+
         document.getElementById('input').onchange = function(e) {
             var reader = new FileReader();
             reader.onload = function(event) {
                 var img = new Image();
-                img.onload = function(){
+                img.onload = function() {
+
+                    var canvas = document.getElementById('canvas');
+                    var ctx = canvas.getContext('2d');
 
                     // scale down to 640x640
                     var img_w = img.width;
@@ -81,65 +145,9 @@
 
                     canvas.width = img_w;
                     canvas.height = img_h;
-                    var ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, img_w, img_h);
 
-                    var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    var data = imageData.data;
-
-                    dst = _malloc(data.length);
-                    HEAPU8.set(data, dst);
-
-                    // max 20 objects
-                    resultarray = new Float32Array(6 * 20);
-                    resultbuffer = _malloc(6 * 20 * Float32Array.BYTES_PER_ELEMENT);
-
-                    HEAPF32.set(resultarray, resultbuffer / Float32Array.BYTES_PER_ELEMENT);
-
-                    _yolov5_ncnn(dst, img_w, img_h, resultbuffer);
-
-                    // resultarray
-                    var qaqarray = HEAPF32.subarray(resultbuffer / Float32Array.BYTES_PER_ELEMENT, resultbuffer / Float32Array.BYTES_PER_ELEMENT + 6 * 20);
-
-                    var i;
-                    for (i = 0; i < 20; i++) {
-                        var label = qaqarray[i * 6 + 0];
-                        var prob = qaqarray[i * 6 + 1];
-                        var bbox_x = qaqarray[i * 6 + 2];
-                        var bbox_y = qaqarray[i * 6 + 3];
-                        var bbox_w = qaqarray[i * 6 + 4];
-                        var bbox_h = qaqarray[i * 6 + 5];
-
-                        if (label == -233)
-                            continue;
-
-                        console.log('qaq ' + label + ' = ' + prob);
-
-                        ctx.strokeStyle = colors[i % 19];
-                        ctx.strokeRect(bbox_x, bbox_y, bbox_w, bbox_h);
-
-                        var text = class_names[label] + " = " + parseFloat(prob * 100).toFixed(2) + "%";
-
-                        ctx.textBaseline = 'top';
-                        var text_width = ctx.measureText(text).width;
-                        var text_height = parseInt(ctx.font, 10);
-
-                        var x = bbox_x;
-                        var y = bbox_y - text_height;
-                        if (y < 0)
-                            y = 0;
-                        if (x + text_width > img_w)
-                            x = img_w - text_width;
-
-                        ctx.fillStyle = "rgb(255,255,255)";
-                        ctx.fillRect(x, y, text_width, text_height);
-                        ctx.fillStyle = "rgb(0,0,0)";
-                        ctx.fillText(text, x, y);
-                    }
-
-                    _free(resultbuffer);
-                    _free(dst);
-
+                    ncnn_yolov5();
                 }
                 img.src = event.target.result;
             }
