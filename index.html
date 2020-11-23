@@ -14,17 +14,32 @@
 
     <script type='text/javascript'>
         var Module = {};
-        fetch('yolov5.wasm')
-            .then(response => response.arrayBuffer())
-            .then(buffer => {
-                Module.wasmBinary = buffer;
-                var script = document.createElement('script');
-                script.src = 'yolov5.js';
-                script.onload = function() {
-                  console.log('Emscripten boilerplate loaded.');
-                }
-                document.body.appendChild(script);
-            });
+        if (typeof SharedArrayBuffer === 'undefined') {
+            fetch('yolov5up.wasm')
+                .then(response => response.arrayBuffer())
+                .then(buffer => {
+                    Module.wasmBinary = buffer;
+                    var script = document.createElement('script');
+                    script.src = 'yolov5up.js';
+                    script.onload = function() {
+                        console.log('Emscripten boilerplate loaded.');
+                    }
+                    document.body.appendChild(script);
+                });
+        }
+        else {
+            fetch('yolov5.wasm')
+                .then(response => response.arrayBuffer())
+                .then(buffer => {
+                    Module.wasmBinary = buffer;
+                    var script = document.createElement('script');
+                    script.src = 'yolov5.js';
+                    script.onload = function() {
+                        console.log('Emscripten boilerplate loaded.');
+                    }
+                    document.body.appendChild(script);
+                });
+        }
 
         var class_names = [
             "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
