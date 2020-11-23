@@ -25,7 +25,7 @@ python3 -m http.server 8888
 
 1. start a http server
 ```
-python3 -m http.server 8888
+python3 server.py
 ```
 
 2. download firefox-nightly from https://www.mozilla.org/en-US/firefox/channel/desktop
