@@ -102,7 +102,7 @@
             ctx = canvas.getContext('2d');
             w = 640;
             h = 480;
-            var constraints = { audio: false, video: { width: w, height: h, facingMode: 'environment' } };
+            var constraints = { audio: false, video: { width: w, height: h} };
             navigator.mediaDevices.getUserMedia(constraints)
                 .then(function(mediaStream) {
                     var video = document.querySelector('video');
