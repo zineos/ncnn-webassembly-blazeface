@@ -11,13 +11,16 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s FORCE_FILESYSTEM=1 -s INITIAL_MEMORY=256M
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s FORCE_FILESYSTEM=1 -s INITIAL_MEMORY=256MB -s EXIT_RUNTIME=1")
 set(CMAKE_EXECUTBLE_LINKER_FLAGS "${CMAKE_EXECUTBLE_LINKER_FLAGS} -s FORCE_FILESYSTEM=1 -s INITIAL_MEMORY=256MB -s EXIT_RUNTIME=1")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=15")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=15")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=15")
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fopenmp -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=15")
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=15")
+# set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fopenmp -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=15")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -sEXPORTED_FUNCTIONS=['_blazeface_ncnn'] --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/assets@.")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -sEXPORTED_FUNCTIONS=['_blazeface_ncnn'] --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/assets@.")
 set(CMAKE_EXECUTBLE_LINKER_FLAGS "${CMAKE_EXECUTBLE_LINKER_FLAGS} -sEXPORTED_FUNCTIONS=['_blazeface_ncnn'] --preload-file ${CMAKE_CURRENT_SOURCE_DIR}/assets@.")
 
-add_executable(blazeface blazeface.cpp)
-target_link_libraries(blazeface ncnn pthread)
+# add_executable(blazeface blazeface.cpp)
+# target_link_libraries(blazeface ncnn pthread)
+
+add_executable(blazeface_ios blazeface.cpp)
+target_link_libraries(blazeface_ios ncnn)

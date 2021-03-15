@@ -64,12 +64,11 @@
                 if (has_simd & has_threads)
                 {
                     blazeface_module_name = 'blazeface';
-                    blazeface_module_name = 'blazeface';
                 }
                 else
                 {
-                    nanodet_module_name = 'blazeface';
-                    nanodet_module_name = 'blazeface';
+                    blazeface_module_name = 'blazeface_ios';
+                    console.log('cannot enable simd&threads.');
                 }
 
                 console.log('load ' + blazeface_module_name);
