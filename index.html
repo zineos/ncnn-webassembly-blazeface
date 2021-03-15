@@ -2,44 +2,157 @@
 
 <head>
     <meta charset="utf-8">
-    <title>ncnn webassembly yolov5</title>
+    <title>ncnn webassembly blazeface camera</title>
+    <link rel="stylesheet" type="text/css" href="index.css?version=2.0.4">
+
+    <style>
+        a:link,a:visited{ 
+            text-decoration:none;  
+        } 
+        a:hover{ 
+            text-decoration:underline; 
+        } 
+        video {
+            /* position: absolute;
+            visibility: hidden; */
+        }
+        canvas {
+            border: 1px solid lightgray;
+        }
+    </style>
+
 </head>
 
 <body>
-    <h3>ncnn webassembly yolov5</h3>
-    <input type="file" id="input" accept="image/*">
-    <div>
-        <canvas id="canvas"></canvas>
+
+    <div class="wrapper">
+        <div class="remind_box">
+            <h1>ncnn webassembly blazeface</h3>
+        </div>
     </div>
+
+    <div class='video_box'>
+        <canvas id="canvas" width="640"></canvas>
+        <video autoplay muted playsinline id="video"></video>
+        <div class="clear"></div>
+    </div>
+
+    <script src="wasmFeatureDetect.js"></script>
 
     <script type='text/javascript'>
         var Module = {};
-        if (typeof SharedArrayBuffer === 'undefined') {
-            fetch('yolov5up.wasm')
-                .then(response => response.arrayBuffer())
-                .then(buffer => {
-                    Module.wasmBinary = buffer;
-                    var script = document.createElement('script');
-                    script.src = 'yolov5up.js';
-                    script.onload = function() {
-                        console.log('Emscripten boilerplate loaded.');
-                    }
-                    document.body.appendChild(script);
-                });
+
+        var has_simd;
+        var has_threads;
+
+        var wasmModuleLoaded = false;
+        var wasmModuleLoadedCallbacks = [];
+
+        Module.onRuntimeInitialized = function() {
+            wasmModuleLoaded = true;
+            for (var i = 0; i < wasmModuleLoadedCallbacks.length; i++) {
+                wasmModuleLoadedCallbacks[i]();
+            }
         }
-        else {
-            fetch('yolov5.wasm')
-                .then(response => response.arrayBuffer())
-                .then(buffer => {
-                    Module.wasmBinary = buffer;
-                    var script = document.createElement('script');
-                    script.src = 'yolov5.js';
-                    script.onload = function() {
-                        console.log('Emscripten boilerplate loaded.');
-                    }
-                    document.body.appendChild(script);
+
+        wasmFeatureDetect.simd().then(simdSupported => {
+            has_simd = simdSupported;
+
+            wasmFeatureDetect.threads().then(threadsSupported => {
+                has_threads = threadsSupported;
+
+                if (has_simd & has_threads)
+                {
+                    blazeface_module_name = 'blazeface';
+                    blazeface_module_name = 'blazeface';
+                }
+                else
+                {
+                    nanodet_module_name = 'blazeface';
+                    nanodet_module_name = 'blazeface';
+                }
+
+                console.log('load ' + blazeface_module_name);
+
+                var blazefacewasm = blazeface_module_name + '.wasm';
+                var blazefacejs = blazeface_module_name + '.js';
+
+                fetch(blazefacewasm)
+                    .then(response => response.arrayBuffer())
+                    .then(buffer => {
+                        Module.wasmBinary = buffer;
+                        var script = document.createElement('script');
+                        script.src = blazefacejs;
+                        script.onload = function() {
+                            console.log('Emscripten boilerplate loaded.');
+                        }
+                        document.body.appendChild(script);
+                    });
+
+            });
+        });
+
+        var dst = null;
+        var resultarray = null;
+        var resultbuffer = null;
+        window.addEventListener('DOMContentLoaded', function() {
+            var isStreaming = false;
+            video = document.getElementById('video');
+            canvas = document.getElementById('canvas');
+            ctx = canvas.getContext('2d');
+            w = 640;
+            h = 480;
+            var constraints = { audio: false, video: { width: w, height: h, facingMode: 'environment' } };
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(function(mediaStream) {
+                    var video = document.querySelector('video');
+                    video.srcObject = mediaStream;
+                    video.onloadedmetadata = function(e) {
+                        video.play();
+                    };
+                })
+                .catch(function(err) {
+                    console.log(err.message);
                 });
-        }
+            // Wait until the video stream canvas play
+            video.addEventListener('canplay', function(e) {
+                if (!isStreaming) {
+                    // videoWidth isn't always set correctly in all browsers
+                    if (video.videoWidth > 0) h = video.videoHeight / (video.videoWidth / w);
+                    canvas.setAttribute('width', w);
+                    canvas.setAttribute('height', h);
+                    isStreaming = true;
+                }
+            }, false);
+
+            // Wait for the video to start to play
+            video.addEventListener('play', function() {
+                //Setup image memory
+                var id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                var d = id.data;
+
+                if (wasmModuleLoaded) {
+                    mallocAndCallSFilter();
+                } else {
+                    wasmModuleLoadedCallbacks.push(mallocAndCallSFilter);
+                }
+
+                function mallocAndCallSFilter() {
+                    dst = _malloc(d.length);
+
+                    // max 20 objects
+                    resultarray = new Float32Array(16 * 20);
+                    resultbuffer = _malloc(16 * 20 * Float32Array.BYTES_PER_ELEMENT);
+
+                    HEAPF32.set(resultarray, resultbuffer / Float32Array.BYTES_PER_ELEMENT);
+
+                    //console.log("What " + d.length);
+
+                    sFilter();
+                }
+            });
+
+        });
 
         var class_names = [
             "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
@@ -75,35 +188,42 @@
             "rgb(139, 125,  96)"
         ];
 
-        function ncnn_yolov5() {
+        function ncnn_blazeface() {
             var canvas = document.getElementById('canvas');
             var ctx = canvas.getContext('2d');
 
             var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             var data = imageData.data;
 
-            dst = _malloc(data.length);
             HEAPU8.set(data, dst);
 
-            // max 20 objects
-            resultarray = new Float32Array(6 * 20);
-            resultbuffer = _malloc(6 * 20 * Float32Array.BYTES_PER_ELEMENT);
-
-            HEAPF32.set(resultarray, resultbuffer / Float32Array.BYTES_PER_ELEMENT);
-
-            _yolov5_ncnn(dst, canvas.width, canvas.height, resultbuffer);
+            var t0 = performance.now()
+            _blazeface_ncnn(dst, canvas.width, canvas.height, resultbuffer);
+            var t1 = performance.now()
+            console.log("blazeface_ncnn " + (t1 - t0) + " milliseconds.")
 
             // resultarray
-            var qaqarray = HEAPF32.subarray(resultbuffer / Float32Array.BYTES_PER_ELEMENT, resultbuffer / Float32Array.BYTES_PER_ELEMENT + 6 * 20);
+            var qaqarray = HEAPF32.subarray(resultbuffer / Float32Array.BYTES_PER_ELEMENT, resultbuffer / Float32Array.BYTES_PER_ELEMENT + 16 * 20);
 
             var i;
             for (i = 0; i < 20; i++) {
-                var label = qaqarray[i * 6 + 0];
-                var prob = qaqarray[i * 6 + 1];
-                var bbox_x = qaqarray[i * 6 + 2];
-                var bbox_y = qaqarray[i * 6 + 3];
-                var bbox_w = qaqarray[i * 6 + 4];
-                var bbox_h = qaqarray[i * 6 + 5];
+                var label = qaqarray[i * 16 + 0];
+                var prob = qaqarray[i * 16 + 1];
+                var bbox_x = qaqarray[i * 16 + 2];
+                var bbox_y = qaqarray[i * 16 + 3];
+                var bbox_w = qaqarray[i * 16 + 4];
+                var bbox_h = qaqarray[i * 16 + 5];
+                var p1_x = qaqarray[i * 16 + 6];
+                var p1_y = qaqarray[i * 16 + 7];
+                var p2_x = qaqarray[i * 16 + 8];
+                var p2_y = qaqarray[i * 16 + 9];
+                var p3_x = qaqarray[i * 16 + 10];
+                var p3_y = qaqarray[i * 16 + 11];
+                var p4_x = qaqarray[i * 16 + 12];
+                var p4_y = qaqarray[i * 16 + 13];
+                var p5_x = qaqarray[i * 16 + 14];
+                var p5_y = qaqarray[i * 16 + 15];
+
 
                 if (label == -233)
                     continue;
@@ -112,6 +232,13 @@
 
                 ctx.strokeStyle = colors[i % 19];
                 ctx.strokeRect(bbox_x, bbox_y, bbox_w, bbox_h);
+
+                ctx.fillStyle = "rgb(255,0,255)";
+                ctx.fillRect(p1_x, p1_y, 5, 5);
+                ctx.fillRect(p2_x, p2_y, 5, 5);
+                ctx.fillRect(p3_x, p3_y, 5, 5);
+                ctx.fillRect(p4_x, p4_y, 5, 5);
+                ctx.fillRect(p5_x, p5_y, 5, 5);
 
                 var text = class_names[label] + " = " + parseFloat(prob * 100).toFixed(2) + "%";
 
@@ -128,46 +255,24 @@
 
                 ctx.fillStyle = "rgb(255,255,255)";
                 ctx.fillRect(x, y, text_width, text_height);
+                ctx.font = "20pt Arial";
                 ctx.fillStyle = "rgb(0,0,0)";
                 ctx.fillText(text, x, y);
             }
-
-            _free(resultbuffer);
-            _free(dst);
         }
 
-        document.getElementById('input').onchange = function(e) {
-            var reader = new FileReader();
-            reader.onload = function(event) {
-                var img = new Image();
-                img.onload = function() {
+        //Request Animation Frame function
+        var sFilter = function() {
+            if (video.paused || video.ended) return;
 
-                    var canvas = document.getElementById('canvas');
-                    var ctx = canvas.getContext('2d');
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(video, 0, 0, w, h);
 
-                    // scale down to 640x640
-                    var img_w = img.width;
-                    var img_h = img.height;
+            ncnn_blazeface();
 
-                    if (img_w > img_h) {
-                        img_h = img_h * 640 / img_w;
-                        img_w = 640;
-                    }
-                    else {
-                        img_w = img_w * 640 / img_h;
-                        img_h = 640;
-                    }
+            window.requestAnimationFrame(sFilter);
+        }
 
-                    canvas.width = img_w;
-                    canvas.height = img_h;
-                    ctx.drawImage(img, 0, 0, img_w, img_h);
-
-                    ncnn_yolov5();
-                }
-                img.src = event.target.result;
-            }
-            reader.readAsDataURL(e.target.files[0]);
-        };
     </script>
 
 </body>
