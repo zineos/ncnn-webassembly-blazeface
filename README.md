@@ -4,7 +4,7 @@
 
 1. launch google chrome browser, open chrome://flags and enable all experimental webassembly features
 
-2. re-launch google chrome browser, open https://nihui.github.io/ncnn-webassembly-blazeface/index.html and enjoy
+2. re-launch google chrome browser, open https://zineos.github.io/ncnn-webassembly-blazeface/index.html and enjoy
 
 ### Method 2: run locally(chrome)
 
